@@ -1,199 +1,322 @@
 <?php
+// app/Controllers/AdminController.php
 namespace App\Controllers;
+use App\Models\MasterDataModel;
 
-use App\Models\AdminModel; 
-use PDO;
-
-class AdminController
-{
+class AdminController {
     private $db;
-    public function __construct($db) { $this->db = $db; }
+    private $masterModel;
+    
+    public function __construct($db) {
+        $this->db = $db;
+        $this->masterModel = new MasterDataModel($db);
+    }
 
     private function checkAdmin() {
-        if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'Admin') {
+        if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'Admin') {
             header('Location: /login'); exit;
         }
     }
 
-    // --- MANAJEMEN PENGGUNA (SEKARANG LENGKAP DENGAN EDIT) ---
+    // === DASHBOARD ADMIN ===
+    public function dashboard() {
+        $this->checkAdmin();
+        
+        $stats = $this->masterModel->getStatsUsulan();
+        
+        // Grafik per pengusul (bisa filter tahun)
+        $tahun = $_GET['tahun'] ?? date('Y');
+        $grafik_data = $this->masterModel->getUsulanPerPengusul($tahun);
+        
+        require __DIR__ . '/../Views/dashboard/admin.php';
+    }
+
+    // ========== MANAJEMEN PENGGUNA ==========
+    
     public function users() {
         $this->checkAdmin();
-        $model = new AdminModel($this->db);
-        $users = $model->getUsers($_GET['search'] ?? '', $_GET['jurusan'] ?? '');
-        $jurusan = $model->getAllJurusan(); 
+        
+        $search = $_GET['search'] ?? '';
+        $jurusan_filter = $_GET['jurusan'] ?? '';
+        
+        $sql = "SELECT u.*, j.nama_jurusan 
+                FROM users u 
+                LEFT JOIN master_jurusan j ON u.jurusan_id = j.id 
+                WHERE 1=1";
+        $params = [];
+        
+        if ($search) {
+            $sql .= " AND (u.username LIKE :search OR u.email LIKE :search)";
+            $params['search'] = "%$search%";
+        }
+        
+        if ($jurusan_filter) {
+            $sql .= " AND u.jurusan_id = :jurusan";
+            $params['jurusan'] = $jurusan_filter;
+        }
+        
+        $sql .= " ORDER BY u.created_at DESC";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $users = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        $jurusan_list = $this->masterModel->getAllJurusan();
+        
         require __DIR__ . '/../Views/admin/users.php';
     }
 
     public function createUser() {
         $this->checkAdmin();
-        if ($_POST['csrf_token'] !== $_SESSION['csrf_token']) die('Security Alert');
-
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $data = [
-                'username'   => trim($_POST['username']),
-                'email'      => trim($_POST['email']),
-                'password'   => password_hash($_POST['password'], PASSWORD_BCRYPT),
-                'role'       => $_POST['role'],
-                'jurusan_id' => !empty($_POST['jurusan_id']) ? $_POST['jurusan_id'] : null
-            ];
-
-            $model = new AdminModel($this->db);
-            try {
-                $model->createUser($data);
-                $_SESSION['toast'] = ['type' => 'success', 'msg' => 'User berhasil ditambahkan'];
-            } catch (\Exception $e) {
-                $_SESSION['toast'] = ['type' => 'error', 'msg' => 'Username/Email sudah ada!'];
-            }
-            header('Location: /users'); exit;
+        
+        if ($_POST['csrf_token'] !== $_SESSION['csrf_token']) die('Invalid Token');
+        
+        $username = $_POST['username'];
+        $email = $_POST['email'];
+        $password = password_hash($_POST['password'], PASSWORD_BCRYPT);
+        $role = $_POST['role'];
+        $jurusan_id = ($role === 'Pengusul') ? ($_POST['jurusan_id'] ?? null) : null;
+        
+        try {
+            $stmt = $this->db->prepare("INSERT INTO users (username, email, password, role, jurusan_id) VALUES (?, ?, ?, ?, ?)");
+            $stmt->execute([$username, $email, $password, $role, $jurusan_id]);
+            
+            $_SESSION['toast'] = ['type' => 'success', 'msg' => 'User berhasil ditambahkan!'];
+        } catch (\Exception $e) {
+            $_SESSION['toast'] = ['type' => 'error', 'msg' => 'Username/Email sudah ada!'];
         }
+        
+        header('Location: /admin/users'); exit;
     }
 
-    // [NEW] UPDATE USER
     public function updateUser() {
         $this->checkAdmin();
-        if ($_POST['csrf_token'] !== $_SESSION['csrf_token']) die('Security Alert');
-
-        $id = $_POST['id'];
-        $password = !empty($_POST['password']) ? password_hash($_POST['password'], PASSWORD_BCRYPT) : null;
         
-        $sql = "UPDATE users SET role = :role, jurusan_id = :jid";
-        $params = ['role' => $_POST['role'], 'jid' => !empty($_POST['jurusan_id']) ? $_POST['jurusan_id'] : null, 'id' => $id];
-
-        if ($password) {
-            $sql .= ", password = :pwd";
-            $params['pwd'] = $password;
+        if ($_POST['csrf_token'] !== $_SESSION['csrf_token']) die('Invalid Token');
+        
+        $id = (int)$_POST['user_id'];
+        $username = $_POST['username'];
+        $email = $_POST['email'];
+        $role = $_POST['role'];
+        $jurusan_id = ($role === 'Pengusul') ? ($_POST['jurusan_id'] ?? null) : null;
+        $is_active = isset($_POST['is_active']) ? 1 : 0;
+        
+        $sql = "UPDATE users SET username = ?, email = ?, role = ?, jurusan_id = ?, is_active = ? WHERE id = ?";
+        $params = [$username, $email, $role, $jurusan_id, $is_active, $id];
+        
+        // Jika ada password baru
+        if (!empty($_POST['password'])) {
+            $sql = "UPDATE users SET username = ?, email = ?, password = ?, role = ?, jurusan_id = ?, is_active = ? WHERE id = ?";
+            $password = password_hash($_POST['password'], PASSWORD_BCRYPT);
+            $params = [$username, $email, $password, $role, $jurusan_id, $is_active, $id];
         }
-        $sql .= " WHERE id = :id";
-
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-
-        $_SESSION['toast'] = ['type' => 'success', 'msg' => 'Data User diperbarui.'];
-        header('Location: /users'); exit;
+        
+        $this->db->prepare($sql)->execute($params);
+        
+        $_SESSION['toast'] = ['type' => 'success', 'msg' => 'User berhasil diperbarui!'];
+        header('Location: /admin/users'); exit;
     }
 
-    public function deleteUser() {
+    public function toggleUserStatus() {
         $this->checkAdmin();
-        if ($_POST['csrf_token'] !== $_SESSION['csrf_token']) die('Security Alert');
         
-        $model = new AdminModel($this->db);
-        $model->softDeleteUser($_POST['id'] ?? 0);
+        if ($_POST['csrf_token'] !== $_SESSION['csrf_token']) die('Invalid Token');
         
-        $_SESSION['toast'] = ['type' => 'success', 'msg' => 'User dinonaktifkan.'];
-        header('Location: /users'); exit;
+        $id = (int)$_POST['user_id'];
+        $this->db->prepare("UPDATE users SET is_active = NOT is_active WHERE id = ?")->execute([$id]);
+        
+        $_SESSION['toast'] = ['type' => 'success', 'msg' => 'Status user diperbarui!'];
+        header('Location: /admin/users'); exit;
     }
 
-    // --- MASTER DATA (JURUSAN & IKU) - FULL CRUD ---
+    // ========== MASTER DATA ==========
     
-    public function indexMaster() {
+    public function masterData() {
         $this->checkAdmin();
-        require __DIR__ . '/../Views/admin/master_landing.php';
+        require __DIR__ . '/../Views/admin/master_data.php';
     }
 
-    // JURUSAN
+    // --- JURUSAN ---
+    
     public function jurusan() {
         $this->checkAdmin();
-        $model = new AdminModel($this->db);
-        $jurusan = $model->getAllJurusan(); 
-        require __DIR__ . '/../Views/admin/jurusan.php';
+        
+        $jurusan_list = $this->masterModel->getAllJurusan(true); // Include inactive
+        
+        require __DIR__ . '/../Views/admin/master_jurusan.php';
     }
 
-    public function storeJurusan() {
+    public function createJurusan() {
         $this->checkAdmin();
+        
         if ($_POST['csrf_token'] !== $_SESSION['csrf_token']) die('Invalid Token');
-
-        $nama = trim($_POST['nama_jurusan']);
-        if (!empty($nama)) {
-            $model = new AdminModel($this->db);
-            $model->createJurusan($nama);
-            $_SESSION['toast'] = ['type' => 'success', 'msg' => 'Jurusan ditambahkan.'];
-        }
-        header('Location: /master/jurusan'); exit;
+        
+        $this->masterModel->createJurusan($_POST['nama_jurusan']);
+        
+        $_SESSION['toast'] = ['type' => 'success', 'msg' => 'Jurusan berhasil ditambahkan!'];
+        header('Location: /admin/master/jurusan'); exit;
     }
 
-    // [NEW] UPDATE JURUSAN
     public function updateJurusan() {
         $this->checkAdmin();
-        if ($_POST['csrf_token'] !== $_SESSION['csrf_token']) die('Invalid Token');
-
-        $stmt = $this->db->prepare("UPDATE master_jurusan SET nama_jurusan = ? WHERE id = ?");
-        $stmt->execute([trim($_POST['nama_jurusan']), $_POST['id']]);
         
-        $_SESSION['toast'] = ['type' => 'success', 'msg' => 'Nama Jurusan diperbarui.'];
-        header('Location: /master/jurusan'); exit;
-    }
-
-    public function deleteJurusan() {
-        $this->checkAdmin();
         if ($_POST['csrf_token'] !== $_SESSION['csrf_token']) die('Invalid Token');
-
-        $model = new AdminModel($this->db);
-        if ($model->deleteJurusan($_POST['id'])) {
-            $_SESSION['toast'] = ['type' => 'success', 'msg' => 'Jurusan dihapus.'];
-        } else {
-            $_SESSION['toast'] = ['type' => 'error', 'msg' => 'Gagal! Ada User di jurusan ini.'];
-        }
-        header('Location: /master/jurusan'); exit;
+        
+        $this->masterModel->updateJurusan($_POST['jurusan_id'], $_POST['nama_jurusan']);
+        
+        $_SESSION['toast'] = ['type' => 'success', 'msg' => 'Jurusan berhasil diperbarui!'];
+        header('Location: /admin/master/jurusan'); exit;
     }
 
-    // IKU
+    public function toggleJurusanStatus() {
+        $this->checkAdmin();
+        
+        if ($_POST['csrf_token'] !== $_SESSION['csrf_token']) die('Invalid Token');
+        
+        $this->masterModel->toggleJurusanStatus($_POST['jurusan_id']);
+        
+        $_SESSION['toast'] = ['type' => 'success', 'msg' => 'Status jurusan diperbarui!'];
+        header('Location: /admin/master/jurusan'); exit;
+    }
+
+    // --- IKU ---
+    
     public function iku() {
         $this->checkAdmin();
-        $model = new AdminModel($this->db);
-        $iku = $model->getAllIku(); 
-        require __DIR__ . '/../Views/admin/iku.php';
+        
+        $iku_list = $this->masterModel->getAllIku(true); // Include inactive
+        
+        require __DIR__ . '/../Views/admin/master_iku.php';
     }
 
-    public function storeIku() {
+    public function createIku() {
         $this->checkAdmin();
+        
         if ($_POST['csrf_token'] !== $_SESSION['csrf_token']) die('Invalid Token');
-
-        $deskripsi = trim($_POST['deskripsi_iku']);
-        if (!empty($deskripsi)) {
-            $model = new AdminModel($this->db);
-            
-            // [FIX] Cek hasil return dari model
-            if ($model->createIku($deskripsi)) {
-                $_SESSION['toast'] = ['type' => 'success', 'msg' => 'IKU berhasil ditambahkan.'];
-            } else {
-                $_SESSION['toast'] = ['type' => 'error', 'msg' => 'Gagal! IKU tersebut sudah ada.'];
-            }
+        
+        if ($this->masterModel->createIku($_POST['deskripsi_iku'])) {
+            $_SESSION['toast'] = ['type' => 'success', 'msg' => 'IKU berhasil ditambahkan!'];
+        } else {
+            $_SESSION['toast'] = ['type' => 'error', 'msg' => 'IKU sudah ada!'];
         }
-        header('Location: /master/iku');
-        exit;
+        
+        header('Location: /admin/master/iku'); exit;
     }
 
     public function updateIku() {
         $this->checkAdmin();
-        if ($_POST['csrf_token'] !== $_SESSION['csrf_token']) die('Invalid Token');
-
-        $id = $_POST['id'];
-        $deskripsi = trim($_POST['deskripsi_iku']);
         
-        if (!empty($deskripsi)) {
-            $model = new AdminModel($this->db);
-            
-            // [FIX] Gunakan method updateIku di model yang sudah divalidasi
-            if ($model->updateIku($id, $deskripsi)) {
-                $_SESSION['toast'] = ['type' => 'success', 'msg' => 'IKU berhasil diperbarui.'];
-            } else {
-                $_SESSION['toast'] = ['type' => 'error', 'msg' => 'Gagal! Deskripsi IKU sudah digunakan.'];
-            }
+        if ($_POST['csrf_token'] !== $_SESSION['csrf_token']) die('Invalid Token');
+        
+        if ($this->masterModel->updateIku($_POST['iku_id'], $_POST['deskripsi_iku'])) {
+            $_SESSION['toast'] = ['type' => 'success', 'msg' => 'IKU berhasil diperbarui!'];
+        } else {
+            $_SESSION['toast'] = ['type' => 'error', 'msg' => 'IKU sudah ada!'];
         }
-        header('Location: /master/iku'); 
-        exit;
+        
+        header('Location: /admin/master/iku'); exit;
     }
 
-    public function deleteIku() {
+    public function toggleIkuStatus() {
         $this->checkAdmin();
+        
         if ($_POST['csrf_token'] !== $_SESSION['csrf_token']) die('Invalid Token');
+        
+        $this->masterModel->toggleIkuStatus($_POST['iku_id']);
+        
+        $_SESSION['toast'] = ['type' => 'success', 'msg' => 'Status IKU diperbarui!'];
+        header('Location: /admin/master/iku'); exit;
+    }
 
-        $model = new AdminModel($this->db);
-        if ($model->deleteIku($_POST['id'])) {
-            $_SESSION['toast'] = ['type' => 'success', 'msg' => 'IKU dihapus.'];
+    // --- SATUAN ANGGARAN ---
+    
+    public function satuan() {
+        $this->checkAdmin();
+        
+        $satuan_list = $this->masterModel->getAllSatuan(true); // Include inactive
+        
+        require __DIR__ . '/../Views/admin/master_satuan.php';
+    }
+
+    public function createSatuan() {
+        $this->checkAdmin();
+        
+        if ($_POST['csrf_token'] !== $_SESSION['csrf_token']) die('Invalid Token');
+        
+        if ($this->masterModel->createSatuan($_POST['nama_satuan'])) {
+            $_SESSION['toast'] = ['type' => 'success', 'msg' => 'Satuan berhasil ditambahkan!'];
         } else {
-            $_SESSION['toast'] = ['type' => 'error', 'msg' => 'Gagal! IKU sedang dipakai.'];
+            $_SESSION['toast'] = ['type' => 'error', 'msg' => 'Satuan sudah ada!'];
         }
-        header('Location: /master/iku'); exit;
+        
+        header('Location: /admin/master/satuan'); exit;
+    }
+
+    public function updateSatuan() {
+        $this->checkAdmin();
+        
+        if ($_POST['csrf_token'] !== $_SESSION['csrf_token']) die('Invalid Token');
+        
+        if ($this->masterModel->updateSatuan($_POST['satuan_id'], $_POST['nama_satuan'])) {
+            $_SESSION['toast'] = ['type' => 'success', 'msg' => 'Satuan berhasil diperbarui!'];
+        } else {
+            $_SESSION['toast'] = ['type' => 'error', 'msg' => 'Satuan sudah ada!'];
+        }
+        
+        header('Location: /admin/master/satuan'); exit;
+    }
+
+    public function toggleSatuanStatus() {
+        $this->checkAdmin();
+        
+        if ($_POST['csrf_token'] !== $_SESSION['csrf_token']) die('Invalid Token');
+        
+        $this->masterModel->toggleSatuanStatus($_POST['satuan_id']);
+        
+        $_SESSION['toast'] = ['type' => 'success', 'msg' => 'Status satuan diperbarui!'];
+        header('Location: /admin/master/satuan'); exit;
+    }
+
+    // === MONITORING KEGIATAN (dengan Filter) ===
+    
+    public function monitoringKegiatan() {
+        $this->checkAdmin();
+        
+        $jurusan_filter = $_GET['jurusan'] ?? '';
+        $status_filter = $_GET['status'] ?? '';
+        $tahun_filter = $_GET['tahun'] ?? '';
+        
+        $sql = "SELECT pk.*, uk.nama_kegiatan, us.username, j.nama_jurusan 
+                FROM pengajuan_kegiatan pk 
+                JOIN usulan_kegiatan uk ON pk.usulan_id = uk.id 
+                JOIN users us ON uk.user_id = us.id 
+                LEFT JOIN master_jurusan j ON us.jurusan_id = j.id 
+                WHERE 1=1";
+        $params = [];
+        
+        if ($jurusan_filter) {
+            $sql .= " AND us.jurusan_id = :jurusan";
+            $params['jurusan'] = $jurusan_filter;
+        }
+        
+        if ($status_filter) {
+            $sql .= " AND pk.status_pengajuan = :status";
+            $params['status'] = $status_filter;
+        }
+        
+        if ($tahun_filter) {
+            $sql .= " AND YEAR(pk.created_at) = :tahun";
+            $params['tahun'] = $tahun_filter;
+        }
+        
+        $sql .= " ORDER BY pk.created_at DESC";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $kegiatan_list = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        $jurusan_list = $this->masterModel->getAllJurusan();
+        
+        require __DIR__ . '/../Views/admin/monitoring_kegiatan.php';
     }
 }
