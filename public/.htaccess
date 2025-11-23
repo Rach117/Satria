@@ -1,0 +1,16 @@
+<IfModule mod_rewrite.c>
+    # 1. Aktifkan Rewrite Engine
+    RewriteEngine On
+
+    # 2. Hapus "Hardcoded Path" (/satria/public/)
+    # Gunakan "/" agar fleksibel untuk domain apa saja (misal: satria.com)
+    RewriteBase /
+
+    # 3. Abaikan jika file atau folder aslinya memang ada
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+
+    # 4. Arahkan sisanya ke index.php
+    RewriteRule ^ index.php [L]
+
+</IfModule>
