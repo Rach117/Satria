@@ -9,6 +9,42 @@
         </div>
     </div>
 
+    <!-- Statistik -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <span class="material-icons">pending_actions</span>
+                </div>
+                <span class="text-xs font-bold text-slate-400 uppercase">Menunggu</span>
+            </div>
+            <div class="text-3xl font-extrabold text-blue-600"><?php echo $stats['pending'] ?? 0; ?></div>
+            <div class="text-xs text-slate-500 mt-1">Usulan baru</div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <span class="material-icons">verified</span>
+                </div>
+                <span class="text-xs font-bold text-slate-400 uppercase">Disetujui</span>
+            </div>
+            <div class="text-3xl font-extrabold text-emerald-600"><?php echo $stats['approved'] ?? 0; ?></div>
+            <div class="text-xs text-slate-500 mt-1">Total bulan ini</div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                    <span class="material-icons">edit</span>
+                </div>
+                <span class="text-xs font-bold text-slate-400 uppercase">Revisi</span>
+            </div>
+            <div class="text-3xl font-extrabold text-amber-600"><?php echo $stats['revision'] ?? 0; ?></div>
+            <div class="text-xs text-slate-500 mt-1">Perlu perbaikan</div>
+        </div>
+    </div>
+
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
         <a href="/verifikasi" class="flex flex-col p-8 bg-white rounded-2xl shadow-lg border border-emerald-100 hover:border-emerald-500 transition-all group cursor-pointer relative overflow-hidden">
             <div class="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>

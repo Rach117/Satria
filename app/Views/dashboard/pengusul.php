@@ -21,6 +21,53 @@
         </div>
     </div>
 
+    <!-- Statistik Usulan -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center">
+                    <span class="material-icons">draft</span>
+                </div>
+                <span class="text-xs font-bold text-slate-400 uppercase">Draft</span>
+            </div>
+            <div class="text-3xl font-extrabold text-slate-800"><?php echo $stats['Draft'] ?? 0; ?></div>
+            <div class="text-xs text-slate-500 mt-1">Belum diajukan</div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                    <span class="material-icons">pending</span>
+                </div>
+                <span class="text-xs font-bold text-slate-400 uppercase">Revisi</span>
+            </div>
+            <div class="text-3xl font-extrabold text-amber-600"><?php echo $stats['Revisi'] ?? 0; ?></div>
+            <div class="text-xs text-slate-500 mt-1">Perlu diperbaiki</div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <span class="material-icons">hourglass_empty</span>
+                </div>
+                <span class="text-xs font-bold text-slate-400 uppercase">Diajukan</span>
+            </div>
+            <div class="text-3xl font-extrabold text-blue-600"><?php echo $stats['Diajukan'] ?? 0; ?></div>
+            <div class="text-xs text-slate-500 mt-1">Sedang diproses</div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <span class="material-icons">check_circle</span>
+                </div>
+                <span class="text-xs font-bold text-slate-400 uppercase">Disetujui</span>
+            </div>
+            <div class="text-3xl font-extrabold text-emerald-600"><?php echo $stats['Disetujui'] ?? 0; ?></div>
+            <div class="text-xs text-slate-500 mt-1">Siap pencairan</div>
+        </div>
+    </div>
+
     <h3 class="text-lg font-bold text-slate-800 mb-6 border-l-4 border-blue-500 pl-3">Menu Cepat</h3>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         

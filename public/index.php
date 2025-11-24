@@ -1,10 +1,12 @@
 <?php
-// public/index.php
+// public/index.php - FULL ROUTING (FIXED & OPTIMIZED)
 
 require_once __DIR__ . '/../vendor/autoload.php';
-// [ELITE INFRA] Load Environment Variables
+
+// Load Environment Variables
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
 $dotenv->load();
+
 // Konfigurasi Keamanan Session
 ini_set('session.cookie_httponly', 1);
 ini_set('session.cookie_secure', isset($_SERVER['HTTPS']));
@@ -17,10 +19,7 @@ if (empty($_SESSION['csrf_token'])) {
 }
 
 set_exception_handler(function ($e) {
-    // Log error sebenarnya ke file server (jangan tampilkan ke user)
     error_log($e->getMessage());
-    
-    // Tampilkan halaman cantik 500
     http_response_code(500);
     require __DIR__ . '/../app/Views/errors/500.php';
     exit;
@@ -32,22 +31,27 @@ $dbConfig = require __DIR__ . '/../config/database.php';
 $dsn = "mysql:host={$dbConfig['host']};dbname={$dbConfig['dbname']};charset={$dbConfig['charset']}";
 $db = new PDO($dsn, $dbConfig['username'], $dbConfig['password'], $dbConfig['options']);
 
-// Import Semua Controller
-use App\Controllers\AuthController;
-use App\Controllers\DashboardController;
-use App\Controllers\MonitoringController;
-use App\Controllers\UsulanController;
-use App\Controllers\UsulanWizardController;
-use App\Controllers\VerifikasiController;
-use App\Controllers\ApprovalController;
-use App\Controllers\NotifikasiController;
-use App\Controllers\AdminController;
-use App\Controllers\KeuanganController; // Baru
-use App\Controllers\LaporanController;  // Baru
-use App\Controllers\PdfController;
-use App\Controllers\DirekturController;
+// Import Controllers
+use App\Controllers\{
+    AuthController,
+    DashboardController,
+    MonitoringController,
+    UsulanWizardController,
+    PengajuanKegiatanController,
+    VerifikasiController,
+    PPKController,
+    WD2Controller,
+    BendaharaController,
+    AdminController,
+    DirekturController,
+    NotifikasiController,
+    PdfController,
+    PageController
+};
 
-function sanitizeInput($data) { return htmlspecialchars(strip_tags(trim($data))); }
+function sanitizeInput($data) { 
+    return htmlspecialchars(strip_tags(trim($data))); 
+}
 $_GET = array_map('sanitizeInput', $_GET);
 $_POST = array_map('sanitizeInput', $_POST);
 
@@ -65,53 +69,69 @@ if ($uri === '/login' && $method === 'POST') {
     $rateLimit['last_attempt'] = time();
 }
 
-// --- ROUTING ---
+// ==================== ROUTING ====================
 
+// === WELCOME & AUTH ===
 if ($uri === '/' || $uri === '/index.php') {
     require __DIR__ . '/../app/Views/welcome.php';
 
 } elseif ($uri === '/login') {
     $auth = new AuthController($db);
-    if ($method === 'POST') $auth->login(); else $auth->showLogin();
+    if ($method === 'POST') $auth->login(); 
+    else $auth->showLogin();
 
 } elseif ($uri === '/logout') {
     $auth = new AuthController($db);
     $auth->logout();
 
-// DASHBOARD & CORE
+// === DASHBOARD ===
 } elseif ($uri === '/dashboard') {
-    $dashboard = new DashboardController($db); // Tambahkan $db parameter
+    $dashboard = new DashboardController($db);
     $dashboard->index();
+
+// === MONITORING ===
 } elseif ($uri === '/monitoring') {
     $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
     $monitor = new MonitoringController($db);
     $monitor->index($page, 10);
+
+} elseif ($uri === '/monitoring/detail') {
+    $id = (int)$_GET['id'];
+    $monitor = new MonitoringController($db);
+    $monitor->detail($id);
+
+// === NOTIFIKASI ===
 } elseif ($uri === '/notifikasi') {
     $notif = new NotifikasiController($db);
     $notif->index();
+
 } elseif ($uri === '/notifikasi/read' && $method === 'POST') {
     $id = (int)$_GET['id'];
     $notif = new NotifikasiController($db);
     $notif->read($id);
 
-// MODUL PENGUSUL
+// === USULAN (3-STEP WIZARD) ===
 } elseif ($uri === '/usulan/create') {
     $wizard = new UsulanWizardController($db);
     if ($method === 'POST') {
-        $wizard->saveDraft(); // Simpan draft
+        $wizard->saveDraft();
     } else {
-        $wizard->create(); // Tampilkan form
+        $wizard->create();
     }
+
 } elseif ($uri === '/usulan/submit' && $method === 'POST') {
     $wizard = new UsulanWizardController($db);
     $wizard->submit();
+
 } elseif ($uri === '/usulan/list') {
     $wizard = new UsulanWizardController($db);
     $wizard->listUsulan();
+
 } elseif ($uri === '/usulan/detail') {
     $id = (int)$_GET['id'];
     $wizard = new UsulanWizardController($db);
     $wizard->detail($id);
+
 } elseif ($uri === '/usulan/edit') {
     $id = (int)$_GET['id'];
     $wizard = new UsulanWizardController($db);
@@ -121,9 +141,11 @@ if ($uri === '/' || $uri === '/index.php') {
         $wizard->edit($id);
     }
 
+// === PENGAJUAN KEGIATAN ===
 } elseif ($uri === '/pengajuan/list') {
     $pengajuan = new PengajuanKegiatanController($db);
-    $pengajuan->list();
+    $pengajuan->listUsulanDisetujui();
+
 } elseif ($uri === '/pengajuan/create') {
     $pengajuan = new PengajuanKegiatanController($db);
     if ($method === 'POST') {
@@ -131,150 +153,258 @@ if ($uri === '/' || $uri === '/index.php') {
     } else {
         $pengajuan->create();
     }
+
 } elseif ($uri === '/pengajuan/detail') {
     $id = (int)$_GET['id'];
     $pengajuan = new PengajuanKegiatanController($db);
     $pengajuan->detail($id);
 
-// MODUL VERIFIKASI
+} elseif ($uri === '/pengajuan/upload-lpj') {
+    $pengajuan = new PengajuanKegiatanController($db);
+    if ($method === 'POST') {
+        $pengajuan->storeLpj();
+    } else {
+        $pengajuan->uploadLpj();
+    }
+
+// === VERIFIKASI ===
 } elseif ($uri === '/verifikasi') {
     $verif = new VerifikasiController($db);
     $verif->index();
+
 } elseif ($uri === '/verifikasi/proses') {
-    $id = (int)$_GET['id'];
     $verif = new VerifikasiController($db);
-    $verif->proses($id);
-} elseif ($uri === '/verifikasi/aksi' && $method === 'POST') {
-    $id = (int)$_GET['id'];
+    $verif->proses();
+
+} elseif ($uri === '/verifikasi/setujui' && $method === 'POST') {
     $verif = new VerifikasiController($db);
-    $verif->aksi($id);
+    $verif->setujui();
 
-// MODUL APPROVAL (WD2/PPK)
-} elseif ($uri === '/approval') {
-    $app = new ApprovalController($db);
-    $app->index();
-} elseif ($uri === '/approval/proses') {
-    $id = (int)$_GET['id'];
-    $app = new ApprovalController($db);
-    $app->proses($id);
-} elseif ($uri === '/approval/aksi' && $method === 'POST') {
-    $id = (int)$_GET['id'];
-    $app = new ApprovalController($db);
-    $app->aksi($id);
+} elseif ($uri === '/verifikasi/revisi' && $method === 'POST') {
+    $verif = new VerifikasiController($db);
+    $verif->revisi();
 
-// MODUL KEUANGAN (BENDAHARA) - FIXED
-} elseif ($uri === '/pencairan') {
-    $keu = new KeuanganController($db);
-    $keu->indexPencairan();
-} elseif ($uri === '/pencairan/proses' && $method === 'POST') {
-    $id = (int)$_GET['id'];
-    $keu = new KeuanganController($db);
-    $keu->prosesPencairan($id);
-} elseif ($uri === '/lpj') {
-    $keu = new KeuanganController($db);
-    $keu->indexLPJ();
-} elseif ($uri === '/lpj/verifikasi' && $method === 'POST') {
-    $id = (int)$_GET['id'];
-    $keu = new KeuanganController($db);
-    $keu->verifikasiLPJ($id);
+} elseif ($uri === '/verifikasi/tolak' && $method === 'POST') {
+    $verif = new VerifikasiController($db);
+    $verif->tolak();
 
-// MODUL DIREKTUR
-} elseif ($uri === '/direktur/monitoring') {
-    $direktur = new DirekturController($db);
-    $direktur->monitoringKegiatan();
-} elseif ($uri === '/direktur/users') {
-    $direktur = new DirekturController($db);
-    $direktur->users();
-} elseif ($uri === '/direktur/master') {
-    $direktur = new DirekturController($db);
-    $direktur->masterData();
-} elseif ($uri === '/direktur/master/jurusan') {
-    $direktur = new DirekturController($db);
-    $direktur->jurusan();
-} elseif ($uri === '/direktur/master/iku') {
-    $direktur = new DirekturController($db);
-    $direktur->iku();
-} elseif ($uri === '/direktur/master/satuan') {
-    $direktur = new DirekturController($db);
-    $direktur->satuan();
+} elseif ($uri === '/verifikasi/riwayat') {
+    $verif = new VerifikasiController($db);
+    $verif->riwayat();
 
-// MODUL ADMIN
+// === PPK ===
+} elseif ($uri === '/ppk') {
+    $ppk = new PPKController($db);
+    $ppk->index();
+
+} elseif ($uri === '/ppk/proses') {
+    $ppk = new PPKController($db);
+    $ppk->proses();
+
+} elseif ($uri === '/ppk/approve' && $method === 'POST') {
+    $ppk = new PPKController($db);
+    $ppk->approve();
+
+} elseif ($uri === '/ppk/riwayat') {
+    $ppk = new PPKController($db);
+    $ppk->riwayat();
+
+// === WD2 ===
+} elseif ($uri === '/wd2') {
+    $wd2 = new WD2Controller($db);
+    $wd2->index();
+
+} elseif ($uri === '/wd2/proses') {
+    $wd2 = new WD2Controller($db);
+    $wd2->proses();
+
+} elseif ($uri === '/wd2/approve' && $method === 'POST') {
+    $wd2 = new WD2Controller($db);
+    $wd2->approve();
+
+} elseif ($uri === '/wd2/riwayat') {
+    $wd2 = new WD2Controller($db);
+    $wd2->riwayat();
+
+// === BENDAHARA ===
+} elseif ($uri === '/bendahara/pencairan') {
+    $bendahara = new BendaharaController($db);
+    $bendahara->pencairan();
+
+} elseif ($uri === '/bendahara/form-pencairan') {
+    $bendahara = new BendaharaController($db);
+    $bendahara->formPencairan();
+
+} elseif ($uri === '/bendahara/proses-pencairan' && $method === 'POST') {
+    $bendahara = new BendaharaController($db);
+    $bendahara->prosesPencairan();
+
+} elseif ($uri === '/bendahara/selesaikan-pencairan' && $method === 'POST') {
+    $bendahara = new BendaharaController($db);
+    $bendahara->selesaikanPencairan();
+
+} elseif ($uri === '/bendahara/lpj-list') {
+    $bendahara = new BendaharaController($db);
+    $bendahara->lpjList();
+
+} elseif ($uri === '/bendahara/lpj-detail') {
+    $bendahara = new BendaharaController($db);
+    $bendahara->lpjDetail();
+
+} elseif ($uri === '/bendahara/verifikasi-lpj' && $method === 'POST') {
+    $bendahara = new BendaharaController($db);
+    $bendahara->verifikasiLpj();
+
+} elseif ($uri === '/bendahara/riwayat') {
+    $bendahara = new BendaharaController($db);
+    $bendahara->riwayatLpj();
+
+// === ADMIN ===
 } elseif ($uri === '/users') {
     $admin = new AdminController($db);
     $admin->users();
-} elseif ($uri === '/users/create' && $method === 'POST') { // RUTE BARU
+
+} elseif ($uri === '/users/create' && $method === 'POST') {
     $admin = new AdminController($db);
     $admin->createUser();
-} elseif ($uri === '/users/delete' && $method === 'POST') { // RUTE BARU
+
+} elseif ($uri === '/users/update' && $method === 'POST') {
     $admin = new AdminController($db);
-    $admin->deleteUser();
+    $admin->updateUser();
+
+} elseif ($uri === '/users/toggle-status' && $method === 'POST') {
+    $admin = new AdminController($db);
+    $admin->toggleUserStatus();
+
 } elseif ($uri === '/master') {
     $admin = new AdminController($db);
-    $admin->indexMaster(); // Panggil halaman landing master
-} elseif ($uri === '/master/iku/store' && $method === 'POST') {
+    $admin->masterData();
+
+} elseif ($uri === '/master/jurusan') {
     $admin = new AdminController($db);
-    $admin->createIku();
-} elseif ($uri === '/master/iku/update' && $method === 'POST') {
-    $admin = new AdminController($db);
-    $admin->updateIku();
-} elseif ($uri === '/master/iku/toggle' && $method === 'POST') {
-    $admin = new AdminController($db);
-    $admin->toggleIkuStatus();
-} elseif ($uri === '/master/jurusan/store' && $method === 'POST') {
+    $admin->jurusan();
+
+} elseif ($uri === '/master/jurusan/create' && $method === 'POST') {
     $admin = new AdminController($db);
     $admin->createJurusan();
+
 } elseif ($uri === '/master/jurusan/update' && $method === 'POST') {
     $admin = new AdminController($db);
     $admin->updateJurusan();
+
 } elseif ($uri === '/master/jurusan/toggle' && $method === 'POST') {
     $admin = new AdminController($db);
     $admin->toggleJurusanStatus();
-} elseif ($uri === '/master/satuan' && $method === 'GET') {
+
+} elseif ($uri === '/master/iku') {
+    $admin = new AdminController($db);
+    $admin->iku();
+
+} elseif ($uri === '/master/iku/create' && $method === 'POST') {
+    $admin = new AdminController($db);
+    $admin->createIku();
+
+} elseif ($uri === '/master/iku/update' && $method === 'POST') {
+    $admin = new AdminController($db);
+    $admin->updateIku();
+
+} elseif ($uri === '/master/iku/toggle' && $method === 'POST') {
+    $admin = new AdminController($db);
+    $admin->toggleIkuStatus();
+
+} elseif ($uri === '/master/satuan') {
     $admin = new AdminController($db);
     $admin->satuan();
-} elseif ($uri === '/master/satuan/store' && $method === 'POST') {
+
+} elseif ($uri === '/master/satuan/create' && $method === 'POST') {
     $admin = new AdminController($db);
     $admin->createSatuan();
+
 } elseif ($uri === '/master/satuan/update' && $method === 'POST') {
     $admin = new AdminController($db);
     $admin->updateSatuan();
+
 } elseif ($uri === '/master/satuan/toggle' && $method === 'POST') {
     $admin = new AdminController($db);
     $admin->toggleSatuanStatus();
-} elseif ($uri === '/audit-log') {
-    $audit = new \App\Controllers\AuditLogController($db);
-    $audit->index();
-} elseif ($uri === '/audit-log/export') {
-    $audit = new \App\Controllers\AuditLogController($db);
-    $audit->export();
 
-// PDF GENERATOR
+} elseif ($uri === '/admin/monitoring-kegiatan') {
+    $admin = new AdminController($db);
+    $admin->monitoringKegiatan();
+// === DIREKTUR ===
+} elseif ($uri === '/direktur/monitoring') {
+    direktur=newDirekturController(direktur = new DirekturController(
+direktur=newDirekturController(db);
+    $direktur->monitoringKegiatan();
+
+} elseif ($uri === '/direktur/users') {
+    direktur=newDirekturController(direktur = new DirekturController(
+direktur=newDirekturController(db);
+    $direktur->users();
+
+} elseif ($uri === '/direktur/master') {
+    direktur=newDirekturController(direktur = new DirekturController(
+direktur=newDirekturController(db);
+    $direktur->masterData();
+
+} elseif ($uri === '/direktur/master/jurusan') {
+    direktur=newDirekturController(direktur = new DirekturController(
+direktur=newDirekturController(db);
+    $direktur->jurusan();
+
+} elseif ($uri === '/direktur/master/iku') {
+    direktur=newDirekturController(direktur = new DirekturController(
+direktur=newDirekturController(db);
+    $direktur->iku();
+
+} elseif ($uri === '/direktur/master/satuan') {
+    direktur=newDirekturController(direktur = new DirekturController(
+direktur=newDirekturController(db);
+    $direktur->satuan();
+
+// === PDF GENERATOR ===
 } elseif (strpos($uri, '/pdf/') === 0) {
-    $id = (int)$_GET['id'];
-    $pdf = new PdfController($db);
-    if ($uri === '/pdf/kak') $pdf->kak($id);
-    elseif ($uri === '/pdf/rab') $pdf->rab($id);
-    elseif ($uri === '/pdf/surat_teguran') $pdf->suratTeguran($id);
-    elseif ($uri === '/pdf/berita_acara') $pdf->beritaAcara($id);
+    id=(int)id = (int)
+id=(int)_GET['id'];
+    pdf=newPdfController(pdf = new PdfController(
+pdf=newPdfController(db);
+    if (uri === '/pdf/kak') $pdf->kak(
+id);
+    elseif (uri === '/pdf/rab') $pdf->rab(
+id);
+    elseif (uri === '/pdf/surat-teguran') $pdf->suratTeguran(
+id);
+    elseif (uri === '/pdf/berita-acara') $pdf->beritaAcara(
+id);
 
+// === PROFIL & PAGES ===
 } elseif ($uri === '/profil') {
-    $page = new \App\Controllers\PageController($db);
+    page=newPageController(page = new PageController(
+page=newPageController(db);
     $page->profil();
-} elseif ($uri === '/bantuan') {
-    $page = new \App\Controllers\PageController($db);
-    $page->bantuan();
-} elseif ($uri === '/syarat') {
-    $page = new \App\Controllers\PageController($db);
-    $page->syarat();
 
 } elseif ($uri === '/profil/update-password' && $method === 'POST') {
-    $page = new \App\Controllers\PageController($db);
+    page=newPageController(page = new PageController(
+page=newPageController(db);
     $page->updatePassword();
+
 } elseif ($uri === '/profil/update-data' && $method === 'POST') {
-    $page = new \App\Controllers\PageController($db);
+    page=newPageController(page = new PageController(
+page=newPageController(db);
     $page->updateProfile();
-    
+
+} elseif ($uri === '/bantuan') {
+    page=newPageController(page = new PageController(
+page=newPageController(db);
+    $page->bantuan();
+
+} elseif ($uri === '/syarat') {
+    page=newPageController(page = new PageController(
+page=newPageController(db);
+    $page->syarat();
+
+// === 404 ===
 } else {
-    http_response_code(404);
-    require __DIR__ . '/../app/Views/errors/404.php';
+http_response_code(404);
+require DIR . '/../app/Views/errors/404.php';
 }

@@ -12,8 +12,44 @@
         </div>
     </div>
 
+    <!-- Statistik -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center">
+                    <span class="material-icons">pending</span>
+                </div>
+                <span class="text-xs font-bold text-slate-400 uppercase">Menunggu</span>
+            </div>
+            <div class="text-3xl font-extrabold text-violet-600"><?php echo $stats['pending'] ?? 0; ?></div>
+            <div class="text-xs text-slate-500 mt-1">Pengajuan baru</div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <span class="material-icons">check_circle</span>
+                </div>
+                <span class="text-xs font-bold text-slate-400 uppercase">Disetujui</span>
+            </div>
+            <div class="text-3xl font-extrabold text-emerald-600"><?php echo $stats['approved'] ?? 0; ?></div>
+            <div class="text-xs text-slate-500 mt-1">Total bulan ini</div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <span class="material-icons">payments</span>
+                </div>
+                <span class="text-xs font-bold text-slate-400 uppercase">Total Nilai</span>
+            </div>
+            <div class="text-2xl font-extrabold text-blue-600">Rp <?php echo number_format(($stats['total_value'] ?? 0) / 1000000, 1); ?> M</div>
+            <div class="text-xs text-slate-500 mt-1">Bulan ini</div>
+        </div>
+    </div>
+
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <a href="/approval" class="col-span-2 group flex items-center p-8 bg-white rounded-2xl shadow-lg border border-violet-100 hover:border-violet-500 transition-all cursor-pointer relative overflow-hidden">
+        <a href="/ppk" class="col-span-2 group flex items-center p-8 bg-white rounded-2xl shadow-lg border border-violet-100 hover:border-violet-500 transition-all cursor-pointer relative overflow-hidden">
             <div class="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity transform group-hover:scale-110">
                 <span class="material-icons text-9xl text-violet-600">verified_user</span>
             </div>

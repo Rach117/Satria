@@ -1,6 +1,7 @@
 <?php include __DIR__.'/../partials/sidebar.php'; ?>
 
-<div class="p-8 max-w-[90rem] mx-auto"> <div class="flex justify-between items-end mb-8">
+<div class="p-8 max-w-[90rem] mx-auto">
+    <div class="flex justify-between items-end mb-8">
         <div>
             <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">Monitoring Progres Kegiatan</h1>
             <p class="text-slate-500 mt-1">Pelacakan real-time status usulan berdasarkan tahapan birokrasi (Sesuai SOP).</p>
@@ -20,15 +21,15 @@
             <div class="md:col-span-3">
                 <select name="status" class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none text-sm text-slate-600">
                     <option value="">- Semua Status -</option>
-                    <option value="Verifikasi">Verifikasi</option>
-                    <option value="Disetujui">Disetujui</option>
-                    <option value="Pencairan">Pencairan</option>
-                    <option value="Selesai">Selesai</option>
+                    <option value="Draft" <?php echo ($_GET['status'] ?? '') === 'Draft' ? 'selected' : ''; ?>>Draft</option>
+                    <option value="Diajukan" <?php echo ($_GET['status'] ?? '') === 'Diajukan' ? 'selected' : ''; ?>>Diajukan</option>
+                    <option value="Disetujui" <?php echo ($_GET['status'] ?? '') === 'Disetujui' ? 'selected' : ''; ?>>Disetujui</option>
+                    <option value="Revisi" <?php echo ($_GET['status'] ?? '') === 'Revisi' ? 'selected' : ''; ?>>Revisi</option>
                     <option value="Ditolak" <?php echo ($_GET['status'] ?? '') === 'Ditolak' ? 'selected' : ''; ?>>Ditolak</option>
                 </select>
             </div>
             <div class="md:col-span-2">
-                <input type="date" name="date" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none text-sm text-slate-600">
+                <input type="date" name="date" value="<?php echo htmlspecialchars($_GET['date'] ?? ''); ?>" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none text-sm text-slate-600">
             </div>
             <div class="md:col-span-2">
                 <button type="submit" class="w-full py-2 bg-slate-800 text-white font-bold rounded-lg hover:bg-slate-900 transition-all text-sm shadow-md">Filter</button>
@@ -59,26 +60,26 @@
                             </th>
                             <th class="px-2 py-4 text-center w-24 border-l border-slate-200">
                                 <div class="flex flex-col items-center gap-1">
-                                    <span class="material-icons text-slate-400 text-lg">supervisor_account</span>
-                                    <span>Tahap 1<br>(ACC WD2)</span>
+                                    <span class="material-icons text-slate-400 text-lg">gavel</span>
+                                    <span>Tahap 1<br>(ACC PPK)</span>
                                 </div>
                             </th>
                             <th class="px-2 py-4 text-center w-24 border-l border-slate-200">
                                 <div class="flex flex-col items-center gap-1">
-                                    <span class="material-icons text-slate-400 text-lg">approval</span>
-                                    <span>Tahap 2<br>(ACC PPK)</span>
+                                    <span class="material-icons text-slate-400 text-lg">supervisor_account</span>
+                                    <span>Tahap 2<br>(ACC WD2)</span>
                                 </div>
                             </th>
                             <th class="px-2 py-4 text-center w-24 border-l border-slate-200">
                                 <div class="flex flex-col items-center gap-1">
                                     <span class="material-icons text-slate-400 text-lg">payments</span>
-                                    <span>Tahap 3<br>(Pencairan)</span>
+                                    <span>Pencairan<br>Dana</span>
                                 </div>
                             </th>
                             <th class="px-2 py-4 text-center w-24 border-l border-slate-200">
                                 <div class="flex flex-col items-center gap-1">
-                                    <span class="material-icons text-slate-400 text-lg">inventory</span>
-                                    <span>Tahap 4<br>(LPJ)</span>
+                                    <span class="material-icons text-slate-400 text-lg">receipt_long</span>
+                                    <span>Upload<br>LPJ</span>
                                 </div>
                             </th>
                             <th class="px-4 py-4 text-center w-28 bg-slate-100/50 border-l border-slate-200">Status Akhir</th>
@@ -87,7 +88,7 @@
                     </thead>
                     <tbody class="divide-y divide-slate-100">
                         <?php foreach ($usulan as $row): 
-                            $s = $row['status_terkini'];
+                            $s = $row['status_usulan'];
                             
                             // Helper Function untuk Icon Checklist Logic
                             $check = function($isActive, $isDone) {
@@ -96,32 +97,35 @@
                                 return '<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-300"><span class="material-icons text-sm">remove</span></span>';
                             };
 
-                            // Logic Mapping Status ke Tahapan (State Machine)
-                            // Urutan: Draft -> Verifikasi -> Menunggu WD2 -> Menunggu PPK -> Disetujui -> Pencairan -> LPJ -> Selesai
+                            // Logic Mapping Status ke Tahapan
+                            // Urutan FIXED: Draft -> Diajukan -> (Verifikasi) -> Disetujui -> (Pengajuan) -> Menunggu PPK -> Menunggu WD2 -> (Bendahara: Pencairan) -> (LPJ)
                             
-                            // 1. Validasi Verifikator
-                            $s1_done = !in_array($s, ['Draft', 'Revisi', 'Verifikasi', 'Ditolak']);
-                            $s1_active = $s === 'Verifikasi';
+                            // 1. Validasi Verifikator (status_usulan)
+                            $s1_done = in_array($s, ['Disetujui']);
+                            $s1_active = $s === 'Diajukan';
 
-                            // 2. ACC WD2
-                            $s2_done = !in_array($s, ['Draft', 'Revisi', 'Verifikasi', 'Menunggu WD2', 'Ditolak']);
-                            $s2_active = $s === 'Menunggu WD2';
+                            // 2-5. Tahapan Pengajuan (status_pengajuan)
+                            $status_pengajuan = $row['status_pengajuan'] ?? null;
+                            
+                            // 2. ACC PPK
+                            $s2_done = in_array($status_pengajuan, ['Menunggu WD2', 'Disetujui']);
+                            $s2_active = $status_pengajuan === 'Menunggu PPK';
 
-                            // 3. ACC PPK
-                            $s3_done = !in_array($s, ['Draft', 'Revisi', 'Verifikasi', 'Menunggu WD2', 'Menunggu PPK', 'Ditolak']);
-                            $s3_active = $s === 'Menunggu PPK';
+                            // 3. ACC WD2
+                            $s3_done = $status_pengajuan === 'Disetujui';
+                            $s3_active = $status_pengajuan === 'Menunggu WD2';
 
-                            // 4. Pencairan (Uang Muka)
-                            $s4_done = in_array($s, ['Pencairan', 'LPJ', 'Selesai']); // Disetujui = Belum cair
-                            $s4_active = $s === 'Disetujui' || $s === 'Pencairan';
+                            // 4. Pencairan Dana
+                            $s4_done = !empty($row['tanggal_pencairan_pertama']);
+                            $s4_active = $status_pengajuan === 'Disetujui' && !$s4_done;
 
-                            // 5. LPJ
-                            $s5_done = $s === 'Selesai';
-                            $s5_active = $s === 'LPJ' || $s === 'Pencairan'; // Pencairan selesai -> Masuk timer LPJ
+                            // 5. Upload LPJ
+                            $s5_done = false; // Implementasi logik cek LPJ selesai
+                            $s5_active = $s4_done && !$s5_done;
 
-                            // Logic Overdue
+                            // Logic Overdue (jika ada batas LPJ)
                             $isLate = false;
-                            if (!empty($row['tgl_batas_lpj']) && $s !== 'Selesai') {
+                            if (!empty($row['tgl_batas_lpj'])) {
                                 if (new DateTime() > new DateTime($row['tgl_batas_lpj'])) $isLate = true;
                             }
                         ?>
@@ -133,8 +137,8 @@
                                 </div>
                                 <div class="flex items-center gap-2 text-xs text-slate-500">
                                     <span class="flex items-center text-slate-400"><span class="material-icons text-[10px] mr-1">person</span> <?php echo htmlspecialchars($row['username']); ?></span>
-                                    <?php if($row['nominal_pencairan'] > 0): ?>
-                                        <span class="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-mono font-bold">Rp <?php echo number_format($row['nominal_pencairan'], 0, ',', '.'); ?></span>
+                                    <?php if($row['nominal_rab'] > 0): ?>
+                                        <span class="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-mono font-bold text-[10px]">Rp <?php echo number_format($row['nominal_rab'], 0, ',', '.'); ?></span>
                                     <?php endif; ?>
                                 </div>
                             </td>
@@ -158,12 +162,12 @@
                             <td class="px-4 py-4 text-center border-l border-slate-100 bg-slate-50/30">
                                 <?php if($s === 'Ditolak'): ?>
                                     <span class="inline-flex px-2 py-1 rounded text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">DITOLAK</span>
-                                <?php elseif($s === 'Selesai'): ?>
+                                <?php elseif($s5_done): ?>
                                     <span class="inline-flex px-2 py-1 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">SELESAI</span>
                                 <?php elseif($isLate): ?>
                                     <span class="inline-flex px-2 py-1 rounded text-[10px] font-bold bg-rose-600 text-white animate-pulse">TERLAMBAT</span>
                                 <?php else: ?>
-                                    <span class="inline-flex px-2 py-1 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200"><?php echo $s; ?></span>
+                                    <span class="inline-flex px-2 py-1 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200"><?php echo $status_pengajuan ?? $s; ?></span>
                                 <?php endif; ?>
                             </td>
 
@@ -179,11 +183,14 @@
             </div>
             
             <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
-                <div class="text-xs text-slate-500">Halaman <?php echo $page; ?></div>
+                <div class="text-xs text-slate-500">Halaman <?php echo $page ?? 1; ?></div>
                 <div class="flex gap-1">
-                    <?php $totalPages = ceil(($total ?? 0) / $perPage); ?>
-                    <?php for ($p = 1; $p <= $totalPages; $p++): ?>
-                        <a href="/monitoring?page=<?php echo $p; ?>" class="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all <?php echo ($p == $page) ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-200'; ?>">
+                    <?php 
+                    $perPage = 10;
+                    $totalPages = ceil(($total ?? count($usulan)) / $perPage); 
+                    for ($p = 1; $p <= $totalPages; $p++): 
+                    ?>
+                        <a href="/monitoring?page=<?php echo $p; ?>" class="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all <?php echo ($p == ($page ?? 1)) ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-200'; ?>">
                             <?php echo $p; ?>
                         </a>
                     <?php endfor; ?>
