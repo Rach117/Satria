@@ -1,107 +1,179 @@
-<?php include __DIR__.'/../partials/sidebar.php'; ?>
+<?php 
+$pageTitle = 'Master Jurusan';
+include __DIR__ . '/../partials/header.php'; 
+?>
 
-<div class="p-8 max-w-5xl mx-auto">
-    <div class="mb-2">
-        <a href="/master" class="text-slate-500 hover:text-blue-600 text-sm flex items-center font-medium transition-colors">
-            <span class="material-icons text-sm mr-1">arrow_back</span> Kembali ke Menu Utama
-        </a>
+<div class="container-fluid">
+    <div class="row">
+        <?php include __DIR__ . '/../partials/sidebar.php'; ?>
+        
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2">Master Jurusan</h1>
+                <div class="btn-toolbar mb-2 mb-md-0">
+                    <a href="/admin/master" class="btn btn-sm btn-outline-secondary me-2">
+                        <i class="bi bi-arrow-left"></i> Kembali
+                    </a>
+                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalTambah">
+                        <i class="bi bi-plus-circle"></i> Tambah Jurusan
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card text-white bg-primary">
+                        <div class="card-body">
+                            <h6 class="card-title">Total Jurusan Aktif</h6>
+                            <h2 class="mb-0"><?= count(array_filter($jurusanList, fn($j) => $j['status'] === 'aktif')) ?></h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card text-white bg-secondary">
+                        <div class="card-body">
+                            <h6 class="card-title">Total Jurusan Diarsipkan</h6>
+                            <h2 class="mb-0"><?= count(array_filter($jurusanList, fn($j) => $j['status'] === 'arsip')) ?></h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-building"></i> Daftar Jurusan</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle" id="tableJurusan">
+                            <thead class="table-light">
+                                <tr>
+                                    <th width="50">No</th>
+                                    <th>Kode</th>
+                                    <th>Nama Jurusan</th>
+                                    <th>Jumlah Pengusul</th>
+                                    <th>Status</th>
+                                    <th>Terakhir Diubah</th>
+                                    <th width="150">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (!empty($jurusanList)): ?>
+                                    <?php 
+                                    $no = 1;
+                                    foreach ($jurusanList as $jur): 
+                                    ?>
+                                        <tr>
+                                            <td><?= $no++ ?></td>
+                                            <td><code><?= htmlspecialchars($jur['kode'] ?? '') ?></code></td>
+                                            <td><strong><?= htmlspecialchars($jur['nama_jurusan']) ?></strong></td>
+                                            <td>
+                                                <span class="badge bg-info"><?= $jur['jumlah_pengusul'] ?? 0 ?> user</span>
+                                            </td>
+                                            <td>
+                                                <?php if ($jur['status'] === 'aktif'): ?>
+                                                    <span class="badge bg-success">Aktif</span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-secondary">Arsip</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">
+                                                    <?= isset($jur['updated_at']) ? date('d M Y', strtotime($jur['updated_at'])) : '-' ?>
+                                                </small>
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm btn-warning" onclick="editJurusan(<?= htmlspecialchars(json_encode($jur)) ?>)">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <?php if ($jur['status'] === 'aktif'): ?>
+                                                    <button class="btn btn-sm btn-secondary" onclick="arsipJurusan(<?= $jur['id'] ?>)">
+                                                        <i class="bi bi-archive"></i>
+                                                    </button>
+                                                <?php else: ?>
+                                                    <button class="btn btn-sm btn-success" onclick="aktifkanJurusan(<?= $jur['id'] ?>)">
+                                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                                    </button>
+                                                <?php endif; ?>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <tr>
+                                        <td colspan="7" class="text-center py-4 text-muted">
+                                            <i class="bi bi-inbox display-4"></i>
+                                            <p class="mt-2">Belum ada data jurusan.</p>
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
+</div>
 
-    <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-        <div>
-            <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">Master Data Jurusan</h1>
-            <p class="text-slate-500 mt-1">Daftar referensi Program Studi dan Unit Kerja.</p>
-        </div>
-        <button onclick="openModal()" class="inline-flex items-center px-5 py-2.5 bg-blue-700 text-white text-sm font-bold rounded-lg shadow-lg hover:bg-blue-800 hover:-translate-y-0.5 transition-all">
-            <span class="material-icons text-sm mr-2">add</span> Tambah Jurusan
-        </button>
-    </div>
-
-    <?php if (isset($_SESSION['toast'])): ?>
-        <div class="mb-4 p-4 rounded-lg bg-<?php echo $_SESSION['toast']['type'] == 'success' ? 'emerald' : 'rose'; ?>-100 text-<?php echo $_SESSION['toast']['type'] == 'success' ? 'emerald' : 'rose'; ?>-700 border border-<?php echo $_SESSION['toast']['type'] == 'success' ? 'emerald' : 'rose'; ?>-200 text-sm font-bold">
-            <?php echo $_SESSION['toast']['msg']; unset($_SESSION['toast']); ?>
-        </div>
-    <?php endif; ?>
-
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm text-left">
-                <thead class="bg-slate-50 text-slate-500 uppercase font-bold text-xs border-b border-slate-200">
-                    <tr>
-                        <th class="px-6 py-4 w-16 text-center">ID</th>
-                        <th class="px-6 py-4">Nama Jurusan / Unit</th>
-                        <th class="px-6 py-4 text-right w-32">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                    <?php if(empty($jurusan)): ?>
-                        <tr>
-                            <td colspan="3" class="px-6 py-12 text-center text-slate-400">
-                                <span class="material-icons text-4xl mb-2 block">folder_off</span>
-                                Belum ada data jurusan.
-                            </td>
-                        </tr>
-                    <?php else: ?>
-                        <?php foreach ($jurusan as $j): ?>
-                        <tr class="hover:bg-slate-50 transition-colors group">
-                            <td class="px-6 py-4 text-center text-slate-400 font-mono text-xs bg-slate-50/50">
-                                <?php echo $j['id']; ?>
-                            </td>
-                            <td class="px-6 py-4">
-                                <div class="font-bold text-slate-700 text-base group-hover:text-blue-700 transition-colors">
-                                    <?php echo htmlspecialchars($j['nama_jurusan']); ?>
-                                </div>
-                            </td>
-                            <td class="px-6 py-4 text-right">
-                                <div class="flex justify-end gap-2">
-                                    <button onclick="editJurusan(<?php echo htmlspecialchars(json_encode($j)); ?>)" class="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-all" title="Edit">
-                                        <span class="material-icons text-sm">edit</span>
-                                    </button>
-                                    
-                                    <form action="/master/jurusan/delete" method="POST" onsubmit="return confirm('Hapus jurusan ini? Warning: User terkait mungkin error.')">
-                                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
-                                        <input type="hidden" name="id" value="<?php echo $j['id']; ?>">
-                                        <button type="submit" class="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-all" title="Hapus">
-                                            <span class="material-icons text-sm">delete</span>
-                                        </button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+<!-- Modal Tambah -->
+<div class="modal fade" id="modalTambah" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="/admin/master/jurusan/tambah">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Tambah Jurusan Baru</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="kode" class="form-label">Kode Jurusan</label>
+                        <input type="text" class="form-control" id="kode" name="kode" placeholder="TI, TS, dll" required>
+                        <small class="text-muted">Kode singkatan jurusan</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="nama_jurusan" class="form-label">Nama Jurusan <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="nama_jurusan" name="nama_jurusan" required>
+                        <small class="text-muted">Contoh: Teknik Informatika</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Simpan
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
 
-<div id="modalJurusan" class="fixed inset-0 z-[99] hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-    <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity" onclick="closeModal()"></div>
-    <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
-        <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg border border-slate-100">
-            
-            <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-                <h3 class="text-lg font-bold text-slate-800 flex items-center" id="modalTitle">
-                    <span class="material-icons text-blue-600 mr-2">add_business</span> Tambah Jurusan
-                </h3>
-                <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-rose-500 transition-colors">
-                    <span class="material-icons">close</span>
-                </button>
-            </div>
-
-            <form id="formJurusan" action="/master/jurusan/store" method="POST" class="p-6 space-y-4">
-                <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
-                <input type="hidden" name="id" id="jurusanId"> 
-                
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nama Jurusan / Unit</label>
-                    <input type="text" name="nama_jurusan" id="namaJurusan" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none text-sm font-medium" placeholder="Contoh: Teknik Mesin">
+<!-- Modal Edit -->
+<div class="modal fade" id="modalEdit" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="/admin/master/jurusan/edit">
+                <input type="hidden" id="edit_id" name="id">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title">Edit Jurusan</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-
-                <div class="mt-6 flex gap-3">
-                    <button type="button" onclick="closeModal()" class="flex-1 px-4 py-2.5 border border-slate-300 text-slate-600 font-bold rounded-lg hover:bg-slate-50 text-sm transition-colors">Batal</button>
-                    <button type="submit" class="flex-1 px-4 py-2.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 text-sm shadow-md transition-colors">Simpan</button>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="edit_kode" class="form-label">Kode Jurusan</label>
+                        <input type="text" class="form-control" id="edit_kode" name="kode" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_nama_jurusan" class="form-label">Nama Jurusan <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="edit_nama_jurusan" name="nama_jurusan" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-save"></i> Update
+                    </button>
                 </div>
             </form>
         </div>
@@ -109,32 +181,36 @@
 </div>
 
 <script>
-    const modal = document.getElementById('modalJurusan');
-    const form = document.getElementById('formJurusan');
-    const title = document.getElementById('modalTitle');
-    const inputId = document.getElementById('jurusanId');
-    const inputNama = document.getElementById('namaJurusan');
+function editJurusan(data) {
+    document.getElementById('edit_id').value = data.id;
+    document.getElementById('edit_kode').value = data.kode || '';
+    document.getElementById('edit_nama_jurusan').value = data.nama_jurusan;
+    new bootstrap.Modal(document.getElementById('modalEdit')).show();
+}
 
-    function openModal() {
-        // Reset ke Mode Tambah
-        form.action = '/master/jurusan/store';
-        title.innerHTML = '<span class="material-icons text-blue-600 mr-2">add_business</span> Tambah Jurusan';
-        inputId.value = '';
-        inputNama.value = '';
-        modal.classList.remove('hidden');
+function arsipJurusan(id) {
+    if (confirm('Apakah Anda yakin ingin mengarsipkan jurusan ini? Jurusan yang diarsipkan tidak akan muncul saat pembuatan user baru.')) {
+        window.location.href = `/admin/master/jurusan/arsip/${id}`;
     }
+}
 
-    function editJurusan(data) {
-        // Set ke Mode Edit
-        form.action = '/master/jurusan/update';
-        title.innerHTML = '<span class="material-icons text-amber-600 mr-2">edit</span> Edit Jurusan';
-        inputId.value = data.id;
-        inputNama.value = data.nama_jurusan;
-        modal.classList.remove('hidden');
+function aktifkanJurusan(id) {
+    if (confirm('Apakah Anda yakin ingin mengaktifkan kembali jurusan ini?')) {
+        window.location.href = `/admin/master/jurusan/aktifkan/${id}`;
     }
+}
 
-    function closeModal() {
-        modal.classList.add('hidden');
+// DataTable
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof $ !== 'undefined' && $.fn.DataTable) {
+        $('#tableJurusan').DataTable({
+            language: {
+                url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/id.json'
+            },
+            order: [[2, 'asc']]
+        });
     }
+});
 </script>
-<?php include __DIR__.'/../partials/footer.php'; ?>
+
+<?php include __DIR__ . '/../partials/footer.php'; ?>
