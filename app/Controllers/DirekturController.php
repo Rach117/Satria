@@ -50,13 +50,18 @@ class DirekturController {
         $jurusan_filter = $_GET['jurusan'] ?? '';
         $status_filter = $_GET['status'] ?? '';
         $tahun_filter = $_GET['tahun'] ?? '';
+        $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+        $perPage = 20;
+        $offset = ($page - 1) * $perPage;
         
-        $sql = "SELECT pk.*, uk.nama_kegiatan, us.username, j.nama_jurusan 
-                FROM pengajuan_kegiatan pk 
-                JOIN usulan_kegiatan uk ON pk.usulan_id = uk.id 
+        // Same query as Admin, excluding Draft
+        $sql = "SELECT uk.*, us.username, j.nama_jurusan, pk.status_pengajuan
+                FROM usulan_kegiatan uk 
                 JOIN users us ON uk.user_id = us.id 
                 LEFT JOIN master_jurusan j ON us.jurusan_id = j.id 
-                WHERE 1=1";
+                LEFT JOIN pengajuan_kegiatan pk ON uk.id = pk.usulan_id
+                WHERE uk.status_usulan != 'Draft'";
+        
         $params = [];
         
         if ($jurusan_filter) {
@@ -65,26 +70,50 @@ class DirekturController {
         }
         
         if ($status_filter) {
-            $sql .= " AND pk.status_pengajuan = :status";
+            $sql .= " AND uk.status_usulan = :status";
             $params['status'] = $status_filter;
         }
         
         if ($tahun_filter) {
-            $sql .= " AND YEAR(pk.created_at) = :tahun";
+            $sql .= " AND YEAR(uk.created_at) = :tahun";
             $params['tahun'] = $tahun_filter;
         }
         
-        $sql .= " ORDER BY pk.created_at DESC";
+        $countSql = "SELECT COUNT(*) as total FROM ($sql) as count_query";
+        $countStmt = $this->db->prepare($countSql);
+        $countStmt->execute($params);
+        $total = $countStmt->fetch(\PDO::FETCH_ASSOC)['total'];
+        
+        $sql .= " ORDER BY uk.created_at DESC LIMIT :offset, :perPage";
         
         $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(":$key", $value);
+        }
+        $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
+        $stmt->bindValue(':perPage', $perPage, \PDO::PARAM_INT);
+        $stmt->execute();
         $kegiatan_list = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        $stats = [
+            'total' => $this->db->query("SELECT COUNT(*) FROM usulan_kegiatan WHERE status_usulan != 'Draft'")->fetchColumn(),
+            'disetujui' => $this->db->query("SELECT COUNT(*) FROM usulan_kegiatan WHERE status_usulan = 'Disetujui'")->fetchColumn(),
+            'revisi' => $this->db->query("SELECT COUNT(*) FROM usulan_kegiatan WHERE status_usulan = 'Revisi'")->fetchColumn(),
+            'ditolak' => $this->db->query("SELECT COUNT(*) FROM usulan_kegiatan WHERE status_usulan = 'Ditolak'")->fetchColumn(),
+        ];
         
         $jurusan_list = $this->masterModel->getAllJurusan();
         
+        $pagination = [
+            'current_page' => $page,
+            'total_pages' => ceil($total / $perPage),
+            'total_items' => $total
+        ];
+        
+        $readonly = true; // Flag untuk view
+        
         require __DIR__ . '/../Views/admin/monitoring_kegiatan.php';
     }
-
     // === MANAJEMEN USER (READ-ONLY) ===
     public function users() {
         $this->checkDirektur();

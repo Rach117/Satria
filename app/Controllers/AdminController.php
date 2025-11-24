@@ -280,43 +280,74 @@ class AdminController {
     // === MONITORING KEGIATAN (dengan Filter) ===
     
     public function monitoringKegiatan() {
-        $this->checkAdmin();
-        
-        $jurusan_filter = $_GET['jurusan'] ?? '';
-        $status_filter = $_GET['status'] ?? '';
-        $tahun_filter = $_GET['tahun'] ?? '';
-        
-        $sql = "SELECT pk.*, uk.nama_kegiatan, us.username, j.nama_jurusan 
-                FROM pengajuan_kegiatan pk 
-                JOIN usulan_kegiatan uk ON pk.usulan_id = uk.id 
-                JOIN users us ON uk.user_id = us.id 
-                LEFT JOIN master_jurusan j ON us.jurusan_id = j.id 
-                WHERE 1=1";
-        $params = [];
-        
-        if ($jurusan_filter) {
-            $sql .= " AND us.jurusan_id = :jurusan";
-            $params['jurusan'] = $jurusan_filter;
-        }
-        
-        if ($status_filter) {
-            $sql .= " AND pk.status_pengajuan = :status";
-            $params['status'] = $status_filter;
-        }
-        
-        if ($tahun_filter) {
-            $sql .= " AND YEAR(pk.created_at) = :tahun";
-            $params['tahun'] = $tahun_filter;
-        }
-        
-        $sql .= " ORDER BY pk.created_at DESC";
-        
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-        $kegiatan_list = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-        
-        $jurusan_list = $this->masterModel->getAllJurusan();
-        
-        require __DIR__ . '/../Views/admin/monitoring_kegiatan.php';
+    $this->checkAdmin();
+    
+    $jurusan_filter = $_GET['jurusan'] ?? '';
+    $status_filter = $_GET['status'] ?? '';
+    $tahun_filter = $_GET['tahun'] ?? '';
+    $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+    $perPage = 20;
+    $offset = ($page - 1) * $perPage;
+    
+    // Build query with CRITICAL filter: Exclude Draft status
+    $sql = "SELECT uk.*, us.username, j.nama_jurusan, pk.status_pengajuan
+            FROM usulan_kegiatan uk 
+            JOIN users us ON uk.user_id = us.id 
+            LEFT JOIN master_jurusan j ON us.jurusan_id = j.id 
+            LEFT JOIN pengajuan_kegiatan pk ON uk.id = pk.usulan_id
+            WHERE uk.status_usulan != 'Draft'"; // CRITICAL: Exclude Draft
+    
+    $params = [];
+    
+    if ($jurusan_filter) {
+        $sql .= " AND us.jurusan_id = :jurusan";
+        $params['jurusan'] = $jurusan_filter;
     }
+    
+    if ($status_filter) {
+        $sql .= " AND uk.status_usulan = :status";
+        $params['status'] = $status_filter;
+    }
+    
+    if ($tahun_filter) {
+        $sql .= " AND YEAR(uk.created_at) = :tahun";
+        $params['tahun'] = $tahun_filter;
+    }
+    
+    // Count total for pagination
+    $countSql = "SELECT COUNT(*) as total FROM ($sql) as count_query";
+    $countStmt = $this->db->prepare($countSql);
+    $countStmt->execute($params);
+    $total = $countStmt->fetch(\PDO::FETCH_ASSOC)['total'];
+    
+    // Add pagination
+    $sql .= " ORDER BY uk.created_at DESC LIMIT :offset, :perPage";
+    
+    $stmt = $this->db->prepare($sql);
+    foreach ($params as $key => $value) {
+        $stmt->bindValue(":$key", $value);
+    }
+    $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
+    $stmt->bindValue(':perPage', $perPage, \PDO::PARAM_INT);
+    $stmt->execute();
+    $kegiatan_list = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    
+    // Get stats (excluding Draft)
+    $stats = [
+        'total' => $this->db->query("SELECT COUNT(*) FROM usulan_kegiatan WHERE status_usulan != 'Draft'")->fetchColumn(),
+        'disetujui' => $this->db->query("SELECT COUNT(*) FROM usulan_kegiatan WHERE status_usulan = 'Disetujui'")->fetchColumn(),
+        'revisi' => $this->db->query("SELECT COUNT(*) FROM usulan_kegiatan WHERE status_usulan = 'Revisi'")->fetchColumn(),
+        'ditolak' => $this->db->query("SELECT COUNT(*) FROM usulan_kegiatan WHERE status_usulan = 'Ditolak'")->fetchColumn(),
+    ];
+    
+    $jurusan_list = $this->masterModel->getAllJurusan();
+    
+    $pagination = [
+        'current_page' => $page,
+        'total_pages' => ceil($total / $perPage),
+        'total_items' => $total
+    ];
+    
+    require __DIR__ . '/../Views/admin/monitoring_kegiatan.php';
+}
 }

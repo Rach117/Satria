@@ -333,11 +333,10 @@ if ($uri === '/' || $uri === '/index.php') {
     $admin->monitoringKegiatan();
 
 // === DIREKTUR (READ-ONLY) ===
-} elseif ($uri === '/direktur/monitoring' || $uri === '/monitoring') {
-    // Direktur menggunakan monitoring yang sama dengan Admin
-    $admin = new AdminController($db);
-    $admin->monitoringKegiatan();
-
+} elseif ($uri === '/direktur/monitoring-kegiatan') {
+    $direktur = new DirekturController($db);
+    $direktur->monitoringKegiatan();
+    
 } elseif ($uri === '/direktur/users') {
     $direktur = new DirekturController($db);
     $direktur->users();
