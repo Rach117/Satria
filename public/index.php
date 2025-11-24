@@ -1,5 +1,5 @@
 <?php
-// public/index.php - FULL ROUTING (FIXED & OPTIMIZED)
+// public/index.php - FIXED ROUTING
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
@@ -331,80 +331,69 @@ if ($uri === '/' || $uri === '/index.php') {
 } elseif ($uri === '/admin/monitoring-kegiatan') {
     $admin = new AdminController($db);
     $admin->monitoringKegiatan();
-// === DIREKTUR ===
-} elseif ($uri === '/direktur/monitoring') {
-    direktur=newDirekturController(direktur = new DirekturController(
-direktur=newDirekturController(db);
-    $direktur->monitoringKegiatan();
+
+// === DIREKTUR (READ-ONLY) ===
+} elseif ($uri === '/direktur/monitoring' || $uri === '/monitoring') {
+    // Direktur menggunakan monitoring yang sama dengan Admin
+    $admin = new AdminController($db);
+    $admin->monitoringKegiatan();
 
 } elseif ($uri === '/direktur/users') {
-    direktur=newDirekturController(direktur = new DirekturController(
-direktur=newDirekturController(db);
+    $direktur = new DirekturController($db);
     $direktur->users();
 
 } elseif ($uri === '/direktur/master') {
-    direktur=newDirekturController(direktur = new DirekturController(
-direktur=newDirekturController(db);
+    $direktur = new DirekturController($db);
     $direktur->masterData();
 
 } elseif ($uri === '/direktur/master/jurusan') {
-    direktur=newDirekturController(direktur = new DirekturController(
-direktur=newDirekturController(db);
+    $direktur = new DirekturController($db);
     $direktur->jurusan();
 
 } elseif ($uri === '/direktur/master/iku') {
-    direktur=newDirekturController(direktur = new DirekturController(
-direktur=newDirekturController(db);
+    $direktur = new DirekturController($db);
     $direktur->iku();
 
 } elseif ($uri === '/direktur/master/satuan') {
-    direktur=newDirekturController(direktur = new DirekturController(
-direktur=newDirekturController(db);
+    $direktur = new DirekturController($db);
     $direktur->satuan();
+
+// === LAPORAN (Untuk Direktur & Admin) ===
+} elseif ($uri === '/laporan') {
+    require __DIR__ . '/../app/Views/laporan/index.php';
 
 // === PDF GENERATOR ===
 } elseif (strpos($uri, '/pdf/') === 0) {
-    id=(int)id = (int)
-id=(int)_GET['id'];
-    pdf=newPdfController(pdf = new PdfController(
-pdf=newPdfController(db);
-    if (uri === '/pdf/kak') $pdf->kak(
-id);
-    elseif (uri === '/pdf/rab') $pdf->rab(
-id);
-    elseif (uri === '/pdf/surat-teguran') $pdf->suratTeguran(
-id);
-    elseif (uri === '/pdf/berita-acara') $pdf->beritaAcara(
-id);
+    $id = (int)$_GET['id'];
+    $pdf = new PdfController($db);
+    if ($uri === '/pdf/kak') $pdf->kak($id);
+    elseif ($uri === '/pdf/rab') $pdf->rab($id);
+    elseif ($uri === '/pdf/surat-teguran') $pdf->suratTeguran($id);
+    elseif ($uri === '/pdf/berita-acara') $pdf->beritaAcara($id);
 
 // === PROFIL & PAGES ===
 } elseif ($uri === '/profil') {
-    page=newPageController(page = new PageController(
-page=newPageController(db);
+    $page = new PageController($db);
     $page->profil();
 
 } elseif ($uri === '/profil/update-password' && $method === 'POST') {
-    page=newPageController(page = new PageController(
-page=newPageController(db);
+    $page = new PageController($db);
     $page->updatePassword();
 
 } elseif ($uri === '/profil/update-data' && $method === 'POST') {
-    page=newPageController(page = new PageController(
-page=newPageController(db);
+    $page = new PageController($db);
     $page->updateProfile();
 
 } elseif ($uri === '/bantuan') {
-    page=newPageController(page = new PageController(
-page=newPageController(db);
+    $page = new PageController($db);
     $page->bantuan();
 
 } elseif ($uri === '/syarat') {
-    page=newPageController(page = new PageController(
-page=newPageController(db);
+    $page = new PageController($db);
     $page->syarat();
 
 // === 404 ===
 } else {
-http_response_code(404);
-require DIR . '/../app/Views/errors/404.php';
+    http_response_code(404);
+    require __DIR__ . '/../app/Views/errors/404.php';
 }
