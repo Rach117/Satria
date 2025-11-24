@@ -45,6 +45,7 @@ use App\Controllers\AdminController;
 use App\Controllers\KeuanganController; // Baru
 use App\Controllers\LaporanController;  // Baru
 use App\Controllers\PdfController;
+use App\Controllers\DirekturController;
 
 function sanitizeInput($data) { return htmlspecialchars(strip_tags(trim($data))); }
 $_GET = array_map('sanitizeInput', $_GET);
@@ -79,7 +80,7 @@ if ($uri === '/' || $uri === '/index.php') {
 
 // DASHBOARD & CORE
 } elseif ($uri === '/dashboard') {
-    $dashboard = new DashboardController();
+    $dashboard = new DashboardController($db); // Tambahkan $db parameter
     $dashboard->index();
 } elseif ($uri === '/monitoring') {
     $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
@@ -144,10 +145,25 @@ if ($uri === '/' || $uri === '/index.php') {
     $keu = new KeuanganController($db);
     $keu->verifikasiLPJ($id);
 
-// MODUL LAPORAN (DIREKTUR) - FIXED
-} elseif ($uri === '/laporan') {
-    $lap = new LaporanController($db);
-    $lap->index();
+// MODUL DIREKTUR
+} elseif ($uri === '/direktur/monitoring') {
+    $direktur = new DirekturController($db);
+    $direktur->monitoringKegiatan();
+} elseif ($uri === '/direktur/users') {
+    $direktur = new DirekturController($db);
+    $direktur->users();
+} elseif ($uri === '/direktur/master') {
+    $direktur = new DirekturController($db);
+    $direktur->masterData();
+} elseif ($uri === '/direktur/master/jurusan') {
+    $direktur = new DirekturController($db);
+    $direktur->jurusan();
+} elseif ($uri === '/direktur/master/iku') {
+    $direktur = new DirekturController($db);
+    $direktur->iku();
+} elseif ($uri === '/direktur/master/satuan') {
+    $direktur = new DirekturController($db);
+    $direktur->satuan();
 
 // MODUL ADMIN
 } elseif ($uri === '/users') {
@@ -162,12 +178,36 @@ if ($uri === '/' || $uri === '/index.php') {
 } elseif ($uri === '/master') {
     $admin = new AdminController($db);
     $admin->indexMaster(); // Panggil halaman landing master
-} elseif ($uri === '/master/iku') {
+} elseif ($uri === '/master/iku/store' && $method === 'POST') {
     $admin = new AdminController($db);
-    $admin->iku();
-} elseif ($uri === '/master/jurusan') {
+    $admin->createIku();
+} elseif ($uri === '/master/iku/update' && $method === 'POST') {
     $admin = new AdminController($db);
-    $admin->jurusan();
+    $admin->updateIku();
+} elseif ($uri === '/master/iku/toggle' && $method === 'POST') {
+    $admin = new AdminController($db);
+    $admin->toggleIkuStatus();
+} elseif ($uri === '/master/jurusan/store' && $method === 'POST') {
+    $admin = new AdminController($db);
+    $admin->createJurusan();
+} elseif ($uri === '/master/jurusan/update' && $method === 'POST') {
+    $admin = new AdminController($db);
+    $admin->updateJurusan();
+} elseif ($uri === '/master/jurusan/toggle' && $method === 'POST') {
+    $admin = new AdminController($db);
+    $admin->toggleJurusanStatus();
+} elseif ($uri === '/master/satuan' && $method === 'GET') {
+    $admin = new AdminController($db);
+    $admin->satuan();
+} elseif ($uri === '/master/satuan/store' && $method === 'POST') {
+    $admin = new AdminController($db);
+    $admin->createSatuan();
+} elseif ($uri === '/master/satuan/update' && $method === 'POST') {
+    $admin = new AdminController($db);
+    $admin->updateSatuan();
+} elseif ($uri === '/master/satuan/toggle' && $method === 'POST') {
+    $admin = new AdminController($db);
+    $admin->toggleSatuanStatus();
 } elseif ($uri === '/audit-log') {
     $audit = new \App\Controllers\AuditLogController($db);
     $audit->index();
