@@ -1,5 +1,5 @@
 <?php
-// app/Controllers/MonitoringController.php (UPDATED)
+// app/Controllers/MonitoringController.php - DRAFT DISEMBUNYIKAN UNTUK NON-PENGUSUL
 namespace App\Controllers;
 
 use PDO;
@@ -31,7 +31,7 @@ class MonitoringController
             'date'    => $_GET['date'] ?? ''
         ];
 
-        // Ambil data usulan dan pengajuan
+        // QUERY DENGAN FILTER DRAFT
         $sql = "SELECT uk.*, us.username, j.nama_jurusan,
                 pk.status_pengajuan, pk.id as pengajuan_id,
                 pd.tanggal_pencairan as tanggal_pencairan_pertama,
@@ -49,10 +49,13 @@ class MonitoringController
         
         $params = [];
         
-        // Filter berdasarkan role
+        // CRITICAL FIX: Sembunyikan Draft untuk Non-Pengusul
         if ($filters['role'] === 'Pengusul') {
             $sql .= " AND uk.user_id = :user_id";
             $params['user_id'] = $filters['user_id'];
+        } else {
+            // ADMIN, DIREKTUR, VERIFIKATOR, dll: HANYA TAMPILKAN YANG SUDAH DIAJUKAN
+            $sql .= " AND uk.status_usulan != 'Draft'";
         }
         
         // Filter search
@@ -86,7 +89,7 @@ class MonitoringController
         $stmt->execute();
         $usulan = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Count total untuk pagination
+        // Count total untuk pagination (dengan filter Draft)
         $countSql = str_replace("SELECT uk.*", "SELECT COUNT(*) as total", explode("LIMIT", $sql)[0]);
         $countStmt = $this->db->prepare($countSql);
         foreach ($params as $key => $value) {
@@ -96,5 +99,54 @@ class MonitoringController
         $total = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
 
         require __DIR__ . '/../Views/monitoring/index.php';
+    }
+    
+    public function detail($id)
+    {
+        if (!isset($_SESSION['user_id'])) {
+            header('Location: /login');
+            exit;
+        }
+        
+        // Ambil detail usulan
+        $stmt = $this->db->prepare("
+            SELECT uk.*, us.username, j.nama_jurusan 
+            FROM usulan_kegiatan uk 
+            JOIN users us ON uk.user_id = us.id 
+            LEFT JOIN master_jurusan j ON us.jurusan_id = j.id 
+            WHERE uk.id = ?
+        ");
+        $stmt->execute([$id]);
+        $usulan = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$usulan) {
+            http_response_code(404);
+            die('Usulan tidak ditemukan');
+        }
+        
+        // Cek akses: Pengusul hanya bisa lihat miliknya, role lain bisa lihat semua (kecuali Draft)
+        if ($_SESSION['role'] === 'Pengusul' && $usulan['user_id'] != $_SESSION['user_id']) {
+            http_response_code(403);
+            die('Akses ditolak');
+        }
+        
+        // Non-Pengusul tidak boleh akses Draft
+        if ($_SESSION['role'] !== 'Pengusul' && $usulan['status_usulan'] === 'Draft') {
+            http_response_code(403);
+            die('Akses ditolak: Usulan masih dalam status Draft');
+        }
+        
+        // Ambil timeline histori
+        $timeline = $this->db->prepare("
+            SELECT lh.*, u.username 
+            FROM log_histori lh 
+            JOIN users u ON lh.user_id = u.id 
+            WHERE lh.usulan_id = ? 
+            ORDER BY lh.timestamp DESC
+        ");
+        $timeline->execute([$id]);
+        $timeline = $timeline->fetchAll(PDO::FETCH_ASSOC);
+        
+        require __DIR__ . '/../Views/monitoring/detail.php';
     }
 }
