@@ -97,11 +97,44 @@ if ($uri === '/' || $uri === '/index.php') {
 // MODUL PENGUSUL
 } elseif ($uri === '/usulan/create') {
     $wizard = new UsulanWizardController($db);
-    if ($method === 'POST') $wizard->store(); else $wizard->create();
+    if ($method === 'POST') {
+        $wizard->saveDraft(); // Simpan draft
+    } else {
+        $wizard->create(); // Tampilkan form
+    }
+} elseif ($uri === '/usulan/submit' && $method === 'POST') {
+    $wizard = new UsulanWizardController($db);
+    $wizard->submit();
+} elseif ($uri === '/usulan/list') {
+    $wizard = new UsulanWizardController($db);
+    $wizard->listUsulan();
 } elseif ($uri === '/usulan/detail') {
     $id = (int)$_GET['id'];
-    $usulan = new UsulanController($db);
-    $usulan->detail($id);
+    $wizard = new UsulanWizardController($db);
+    $wizard->detail($id);
+} elseif ($uri === '/usulan/edit') {
+    $id = (int)$_GET['id'];
+    $wizard = new UsulanWizardController($db);
+    if ($method === 'POST') {
+        $wizard->update($id);
+    } else {
+        $wizard->edit($id);
+    }
+
+} elseif ($uri === '/pengajuan/list') {
+    $pengajuan = new PengajuanKegiatanController($db);
+    $pengajuan->list();
+} elseif ($uri === '/pengajuan/create') {
+    $pengajuan = new PengajuanKegiatanController($db);
+    if ($method === 'POST') {
+        $pengajuan->store();
+    } else {
+        $pengajuan->create();
+    }
+} elseif ($uri === '/pengajuan/detail') {
+    $id = (int)$_GET['id'];
+    $pengajuan = new PengajuanKegiatanController($db);
+    $pengajuan->detail($id);
 
 // MODUL VERIFIKASI
 } elseif ($uri === '/verifikasi') {
